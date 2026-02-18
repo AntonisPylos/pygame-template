@@ -35,7 +35,3 @@ pygame build {REPO_NAME}
 
 This project is licensed under the {LICENSE} License.
 See the [`LICENSE.txt`](LICENSE.txt) file for the full license text.
-
----
-
-> Template by [AntonisPylos/pygame-template](https://github.com/AntonisPylos/pygame-template).

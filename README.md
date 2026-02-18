@@ -11,7 +11,7 @@
 
 ## Getting Started
 
-Install pygame-cli:
+Install [pygame-cli](https://github.com/AntonisPylos/pygame-cli):
 ```bash
 pip install pygame-cli
 ```

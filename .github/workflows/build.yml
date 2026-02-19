@@ -1,0 +1,137 @@
+name: Build
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update
+          sudo apt install -y git patchelf
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install git
+
+      - name: Install Windows dependencies
+        if: runner.os == 'Windows'
+        run: |
+          choco install git -y
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pygame-cli
+
+      - name: Get repository name
+        id: repo
+        shell: bash
+        run: |
+          REPO_NAME="${{ github.event.repository.name }}"
+          echo "repo_name=$REPO_NAME" >> $GITHUB_OUTPUT
+
+      - name: Configure git credentials
+        shell: bash
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "git@github.com:"
+
+      - name: Clone and prepare project
+        shell: bash
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          OUTPUT=$(pygame clone git@github.com:${{ github.repository }}.git 2>&1)
+          echo "$OUTPUT"
+          PROJECT_PATH=$(echo "$OUTPUT" | grep "Path:" | sed 's/Path: //')
+          echo "PROJECT_PATH=$PROJECT_PATH" >> $GITHUB_ENV
+
+          cd "$PROJECT_PATH"
+
+          # Activate virtual environment and install dependencies
+          if [ -f "requirements.txt" ]; then
+            if [ "${{ runner.os }}" == "Windows" ]; then
+              source .env/Scripts/activate
+            else
+              source .env/bin/activate
+            fi
+            pip install -r requirements.txt
+          fi
+
+          # Generate __pycache__ files
+          python -m compileall .
+
+      - name: Build project
+        shell: bash
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          pygame build "${{ steps.repo.outputs.repo_name }}"
+
+      - name: Organize build artifacts
+        shell: bash
+        run: |
+          mkdir -p release/${{ runner.os }}
+          if [ -d "build" ]; then
+            cp -r build/* release/${{ runner.os }}/
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ runner.os }}
+          path: release/${{ runner.os }}/
+          if-no-files-found: warn
+
+  combine-and-release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Organize into single release folder
+        run: |
+          mkdir -p release
+          cp -r artifacts/release-Linux release/Linux
+          cp -r artifacts/release-macOS release/macOS
+          cp -r artifacts/release-Windows release/Windows
+
+      - name: Create release archives
+        run: |
+          cd release
+          zip -r ../Linux.zip Linux/
+          zip -r ../macOS.zip macOS/
+          zip -r ../Windows.zip Windows/
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            Linux-build.zip
+            macOS-build.zip
+            Windows-build.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

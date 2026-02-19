@@ -91,9 +91,9 @@ jobs:
       - name: Organize build artifacts
         shell: bash
         run: |
-          mkdir -p release/${{ runner.os }}
+          mkdir -p release/${{ runner.os }}/${{ steps.repo.outputs.repo_name }}
           if [ -d "build" ]; then
-            cp -r build/* release/${{ runner.os }}/
+            cp -r build/* release/${{ runner.os }}/${{ steps.repo.outputs.repo_name }}/
           fi
 
       - name: Upload build artifacts
@@ -112,26 +112,23 @@ jobs:
         with:
           path: artifacts
 
-      - name: Organize into single release folder
-        run: |
-          mkdir -p release
-          cp -r artifacts/release-Linux release/Linux
-          cp -r artifacts/release-macOS release/macOS
-          cp -r artifacts/release-Windows release/Windows
-
       - name: Create release archives
         run: |
-          cd release
-          zip -r ../Linux.zip Linux/
-          zip -r ../macOS.zip macOS/
-          zip -r ../Windows.zip Windows/
+          cd artifacts/release-Linux
+          tar -czf ../../Linux.tar.gz *
+          
+          cd ../release-macOS
+          tar -czf ../../macOS.tar.gz *
+          
+          cd ../release-Windows
+          zip -r ../../Windows.zip *
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            Linux.zip
-            macOS.zip
+            Linux.tar.gz
+            macOS.tar.gz
             Windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

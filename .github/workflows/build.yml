@@ -130,8 +130,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            Linux-build.zip
-            macOS-build.zip
-            Windows-build.zip
+            Linux.zip
+            macOS.zip
+            Windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
